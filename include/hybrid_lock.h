@@ -32,6 +32,9 @@ struct hybrid
 	platform_sem_t sem;
 } __attribute__((aligned(64)));
 
+_Static_assert(sizeof(struct hybrid) <= 64, 
+    "CRITICAL: struct hybrid exceeds standard L1 cache line width!");
+
 static inline void hybrid_initial(struct hybrid* lock)
 {
 	lock->wait = 0;
@@ -53,9 +56,17 @@ static inline int hybrid_try(struct hybrid* lock)
 
 static inline void hybrid_lock(struct hybrid* lock, int spin)
 {
+	int expected = 0;
+
+	// Hint to Clang that the lock is almost always captured immediately
+    if (__builtin_expect(atomic_compare_exchange_strong_explicit(&lock->wait, 
+        &expected, 1, memory_order_acquire, memory_order_relaxed), 1)) {
+        return;
+    }
+
 	do
 	{
-		int expected = 0;
+		expected = 0;
 		if(atomic_compare_exchange_strong_explicit(&lock->wait, &expected, 1, memory_order_acquire, memory_order_relaxed))
 			return;
 	} while(spin-- > 0 
