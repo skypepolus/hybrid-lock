@@ -42,12 +42,12 @@ static inline void hybrid_initial(struct hybrid* lock)
 #endif
 }
 
-static inline int hybrid_try(struct hybrid* lock)
+static inline unsigned hybrid_try(struct hybrid* lock)
 {
 	int expected = 0;
-	if(atomic_compare_exchange_strong_explicit(&lock->wait, &expected, 1, memory_order_acquire, memory_order_relaxed))
+	if(0 == atomic_load_explicit(&lock->wait, memory_order_relaxed)
+	&& atomic_compare_exchange_strong_explicit(&lock->wait, &expected, 1, memory_order_acquire, memory_order_relaxed))
 		return 1; /* Success */
-	
 	return 0; /* Code busy/held */
 }
 
@@ -56,12 +56,12 @@ static inline void hybrid_lock(struct hybrid* lock, int spin)
 	do
 	{
 		int expected = 0;
-		if(atomic_compare_exchange_strong_explicit(&lock->wait, &expected, 1, memory_order_acquire, memory_order_relaxed))
+		if(0 == atomic_load_explicit(&lock->wait, memory_order_relaxed)
+		&& atomic_compare_exchange_strong_explicit(&lock->wait, &expected, 1, memory_order_acquire, memory_order_relaxed))
 			return;
 	} while(spin-- > 0 
 	&& (platform_spin_pause(), 1) 
 	&& 1 >= atomic_load_explicit(&lock->wait, memory_order_relaxed));
-
 	if(0 < atomic_fetch_add_explicit(&lock->wait, 1, memory_order_relaxed)) {
 		/* threads may wait */
 #if defined(__APPLE__)
