@@ -62,6 +62,7 @@ static inline void hybrid_lock(struct hybrid* lock, int spin)
 	} while(spin-- > 0 
 	&& (platform_spin_pause(), 1) 
 	&& 1 >= atomic_load_explicit(&lock->wait, memory_order_relaxed));
+
 	if(0 < atomic_fetch_add_explicit(&lock->wait, 1, memory_order_relaxed)) {
 		/* threads may wait */
 #if defined(__APPLE__)
